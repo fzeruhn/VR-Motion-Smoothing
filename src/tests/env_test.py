@@ -45,15 +45,27 @@ for line in build_info.split('\n'):
 print(f"\n{'='*20} OFA Test {'='*20}")
 print("Starting VR Engine Test...")
     
-# 1. Initialize the Hardware ONCE (Pass your 8K dimensions)
-# Width = 7680, Height = 4320
+import torch
+import blackwell_ofa
+
+# 1. Init
 ofa_engine = blackwell_ofa.Engine(7680, 4320)
-    
-# 2. Allocate VRAM buffers
-frame1 = torch.rand((4320, 7680), device='cuda', dtype=torch.float32)
-frame2 = torch.rand((4320, 7680), device='cuda', dtype=torch.float32)
-    
-# 3. Stream frames into the silicon
-print("Sending VRAM pointers to Blackwell Silicon...")
+
+# 2. Create 8K dummy frames (Note the shape: Height, Width)
+# Updated Test Data: 8-bit Grayscale pixels
+frame1 = torch.randint(0, 255, (4320, 7680), device='cuda', dtype=torch.uint8).contiguous()
+frame2 = torch.randint(0, 255, (4320, 7680), device='cuda', dtype=torch.uint8).contiguous()
+
+# 3. Execute
+print("Firing Blackwell OFA Silicon...")
 motion_vectors = ofa_engine.calc(frame1, frame2)
-print(f"SUCCESS: Motion Vector Shape: {motion_vectors.shape} on {motion_vectors.device}")
+
+# 4. Verify Output
+print(f"Result Shape: {motion_vectors.shape}") # Should be [4320, 7680, 2]
+print(f"Max Motion Detected: {motion_vectors.max().item()}")
+print(f"Min Motion Detected: {motion_vectors.min().item()}")
+
+if motion_vectors.any():
+    print("SUCCESS: Hardware returned non-zero motion data!")
+else:
+    print("STATUS: Hardware returned zeros (Expected if frames are random noise).")

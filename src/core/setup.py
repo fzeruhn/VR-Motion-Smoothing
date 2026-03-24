@@ -28,7 +28,7 @@ setup(
                     '-O3'
                 ]
             },
-            #libraries=['nvOfAPI64'] # It will now look for this file inside library_dirs
+            libraries=['cuda']
         )
     ],
     cmdclass={
