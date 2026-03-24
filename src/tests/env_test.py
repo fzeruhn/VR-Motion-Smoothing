@@ -5,6 +5,7 @@ import pycuda.driver as cuda_driver
 import cv2
 import sys
 import numpy as np
+import blackwell_ofa
 
 # 1. Initialize CUDA for PyCUDA
 try:
@@ -40,3 +41,19 @@ build_info = cv2.getBuildInformation()
 for line in build_info.split('\n'):
     if 'NVIDIA GPU arch' in line or 'NVIDIA PTX archs' in line or 'cuDNN' in line or 'CUDA' in line:
         print(line.strip())
+
+print(f"\n{'='*20} OFA Test {'='*20}")
+print("Starting VR Engine Test...")
+    
+# 1. Initialize the Hardware ONCE (Pass your 8K dimensions)
+# Width = 7680, Height = 4320
+ofa_engine = blackwell_ofa.Engine(7680, 4320)
+    
+# 2. Allocate VRAM buffers
+frame1 = torch.rand((4320, 7680), device='cuda', dtype=torch.float32)
+frame2 = torch.rand((4320, 7680), device='cuda', dtype=torch.float32)
+    
+# 3. Stream frames into the silicon
+print("Sending VRAM pointers to Blackwell Silicon...")
+motion_vectors = ofa_engine.calc(frame1, frame2)
+print(f"SUCCESS: Motion Vector Shape: {motion_vectors.shape} on {motion_vectors.device}")
