@@ -1,2 +1,2 @@
 # VR-Motion-Smoothing
-An attempt to dynamically and efficently interpolate VR usage to increase performance and perceived frametimes
+An attempt to dynamically and efficently interpolate frames in VR to increase performance and perceived frametimes
