@@ -33,49 +33,10 @@ build_info = cv2.getBuildInformation()
 has_cudnn = "cuDNN: YES" in build_info
 print(f"OpenCV cuDNN:     {'YES' if has_cudnn else 'NO (Check CMake paths if needed later)'}")
 
-# 2. Hardware Stress Test: The Nvidia Optical Flow (OFA) Engine
-print(f"\n{'='*20} Blackwell OFA Hardware Test {'='*20}")
+print(f"\n{'='*20} OpenCV GPU Architevture Check {'='*20}")
+build_info = cv2.getBuildInformation()
 
-width, height = 1024, 1024
-roiData = None  
-preset = 5      # NV_OF_PERF_LEVEL_SLOW (Highest quality)
-
-# Allocate GPU Memory for the frames (directly in VRAM)
-gpu_frame1 = cv2.cuda_GpuMat(height, width, cv2.CV_8UC3)
-gpu_frame2 = cv2.cuda_GpuMat(height, width, cv2.CV_8UC3)
-
-# Fill them with zeros so the hardware doesn't process random garbage memory
-gpu_frame1.upload(np.zeros((height, width, 3), dtype=np.uint8))
-gpu_frame2.upload(np.zeros((height, width, 3), dtype=np.uint8))
-
-print("Hunting for Blackwell-compatible OFA Grid Size (4x4, 2x2, 1x1)...")
-ofa_success = False
-
-# Grid size mapping: 1 usually means 4x4, 2 means 2x2, 4 means 1x1
-for g_size in [1, 2, 4]:
-    try:
-        # THE FIX: Strictly positional arguments. No keywords allowed!
-        nvof = cv2.cuda.NvidiaOpticalFlow_2_0_create((width, height), None, 5, g_size)
-        
-        # Run the calculation
-        flow = nvof.calc(gpu_frame1, gpu_frame2, None)
-        
-        print(f"\nOFA Status:       SUCCESS (Hardware Session Active!)")
-        print(f"Accepted Grid:    {g_size}")
-        print(f"OFA Output Size:  {flow.size()}")
-        
-        # Important: Release the hardware session to prevent VRAM leaks
-        nvof.collectGarbage()
-        ofa_success = True
-        break  # Exit the loop since we found the working configuration
-        
-    except Exception as e:
-        # Clean up the error output so it's easier to read
-        error_msg = str(e).split('\n')[0]
-        print(f" -> Grid Size {g_size} rejected: {error_msg}")
-
-if not ofa_success:
-    print(f"\nOFA Status:       CRITICAL FAILURE")
-    print("Error Detail:     All OFA grid sizes failed.")
-
-print(f"\n{'='*66}")
+# Filter the massive output to just the lines we care about
+for line in build_info.split('\n'):
+    if 'NVIDIA GPU arch' in line or 'NVIDIA PTX archs' in line or 'cuDNN' in line or 'CUDA' in line:
+        print(line.strip())

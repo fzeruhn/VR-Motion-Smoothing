@@ -1,1 +1,4 @@
 *.png
+/src/core/build
+/src/core/blackwell_ofa.egg-info
+.vs/
