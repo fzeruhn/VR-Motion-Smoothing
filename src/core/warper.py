@@ -34,13 +34,9 @@ class VFMotionSmoother:
         # Strip batch dim to return (3, H, W)
         return warped.squeeze(0) 
     
-    # Estimates disocclusions (holes) by warping the depth map and detecting 
-    # severe stretching caused by diverging motion vectors, plus edge boundaries
-    def get_hole_mask(self, depth_map, flow, t):
-        # 1. Warp the depth map (needs a channel dim: 1, H, W)
-        warped_depth = self.warp_frame(depth_map.unsqueeze(0), flow, t_scale=(1 - t))
-        
-        # 2. Calculate spatial gradients to find "stretched" tears in the Z-buffer
+    # Estimates directional disocclusions by detecting severe stretching in a warped depth map
+    def get_directional_mask(self, warped_depth, flow, t_scale):
+        # 1. Calculate spatial gradients to find "stretched" tears in the Z-buffer
         dx = torch.abs(warped_depth[:, :, 1:] - warped_depth[:, :, :-1])
         dy = torch.abs(warped_depth[:, 1:, :] - warped_depth[:, :-1, :])
         
@@ -50,18 +46,16 @@ class VFMotionSmoother:
         
         depth_edges = dx + dy
         
-        # 3. Threshold to binary mask (Assumes depth is normalized 0.0 - 1.0)
-        # You may need to tune '0.05' based on your engine's near/far clipping planes
+        # 2. Threshold to binary mask
         disocclusion_mask = (depth_edges > 0.05).to(torch.float32)
         
-        # 4. Find out-of-bounds pixels (screen edges) by warping a solid block of 1s
-        ones = torch.ones_like(depth_map).unsqueeze(0)
-        warped_ones = self.warp_frame(ones, flow, t_scale=(1 - t))
+        # 3. Find out-of-bounds pixels (screen edges) by warping a solid block of 1s
+        ones = torch.ones_like(warped_depth)
+        warped_ones = self.warp_frame(ones, flow, t_scale)
         edge_mask = (warped_ones < 0.99).to(torch.float32)
         
-        # 5. Combine and return as (1, H, W)
-        final_mask = torch.clamp(disocclusion_mask + edge_mask, 0.0, 1.0)
-        return final_mask
+        # 4. Combine and return as (1, H, W)
+        return torch.clamp(disocclusion_mask + edge_mask, 0.0, 1.0)
 
     # Dynamically outputs the necessary frames to hit 90 FPS.
     def generate_frames(self, frame_prev, frame_curr, depth_map, motion_vectors, input_fps):
@@ -97,10 +91,14 @@ class VFMotionSmoother:
             # Blend using the occlusion-aware weights
             blended_frame = (warp_f0 * w0 + warp_f1 * w1)
 
-            # Calculate the real hole mask for this timestep
-            current_mask = self.get_hole_mask(depth_map, flow_f32, t)
+            # Calculate holes for Frame A (past) and Frame B (future) independently
+            mask_0 = self.get_directional_mask(warp_d0, flow_f32, t_scale=-t)
+            mask_1 = self.get_directional_mask(warp_d1, flow_f32, t_scale=(1 - t))
+            
+            # INTERSECTION: Only flag it as a hole if BOTH frames are missing data!
+            double_occlusion_mask = mask_0 * mask_1 
             
             synthetic_frames.append(blended_frame.to(torch.uint8))
-            hole_masks.append(current_mask)
+            hole_masks.append(double_occlusion_mask)
             
         return synthetic_frames, hole_masks
