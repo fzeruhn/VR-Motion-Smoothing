@@ -109,11 +109,11 @@ def main():
                     warped_frames,
                     hole_masks,
                     get6DOF(), # ^ Train with data from here up ^
-                    getEyes()
+                    getEyes() # Use to run ai only on what you're looking at
                 )
                 
             else:
-                # Native 90 FPS, pass through
+                # Native TARGET_FPS, pass through
                 final_frames = frame_curr
             
             
