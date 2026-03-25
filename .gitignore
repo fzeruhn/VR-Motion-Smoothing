@@ -2,3 +2,4 @@
 /src/core/build
 /src/core/blackwell_ofa.egg-info
 .vs/
+.vscode/
