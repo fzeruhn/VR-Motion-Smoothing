@@ -4,9 +4,9 @@ import torch
 # Our custom C++ hardware bridges
 import blackwell_ofa
 import core.warper as smoother
-from core.neural_inpaint import FastInpainter
-from capture.input_hook import get_vr_color_and_depth
-from capture.output_hook import submit
+from core.inpaint import inpainter
+from connection.capture_hook import get_vr_color_and_depth
+from connection.headset_hook import submit, get6DOF, getEyes
 
 def main():
     print("Initializing Neural VR Motion Smoothing Engine...")
@@ -25,7 +25,7 @@ def main():
 
     # 2. Neural Inpainting Model (For edge gaps & disocclusions)
     print("Loading TensorRT Inpainting Model to VRAM...")
-    inpainter = FastInpainter(model_path="models/vfi_inpaint_fp8.engine")
+    inpainter = inpainter(model_path="models/vfi_inpaint_fp8.engine")
     
     # 3. VR Hook (Color + Depth Buffers)
     print("Connecting to OpenXR Swapchains (Color + Z-Buffer)...")
@@ -90,7 +90,8 @@ def main():
                     depth_prev,
                     depth_curr, 
                     motion_vectors, 
-                    fps
+                    fps,
+                    get6DOF()
                 )
                 
                 # ---------------------------------------------------------
@@ -98,14 +99,28 @@ def main():
                 # The AI model looks at the hole_mask and hallucinates the 
                 # missing background pixels and edge gaps instantly.
                 # ---------------------------------------------------------
-                
-                final_frames = inpainter.fill(warped_frames[0], hole_masks)
+
+                filled_frames = inpainter.fill(
+                    frame_prev,
+                    frame_curr,
+                    depth_prev,
+                    depth_curr,
+                    motion_vectors,
+                    warped_frames,
+                    hole_masks,
+                    get6DOF(), # ^ Train with data from here up ^
+                    getEyes()
+                )
                 
             else:
                 # Native 90 FPS, pass through
                 final_frames = frame_curr
             
             
+            # TODO
+            # Shift frame with latest headset data
+            final_frames = warper.shift(filled_frames, get6DOF())
+
             # Send the frame to headset
             submit(final_frames)
             

@@ -58,7 +58,7 @@ class VFMotionSmoother:
         return torch.clamp(disocclusion_mask + edge_mask, 0.0, 1.0)
 
     # Dynamically outputs the necessary frames to hit 90 FPS.
-    def generate_frames(self, frame_prev, frame_curr, depth_prev, depth_curr, motion_vectors, input_fps):
+    def generate_frames(self, frame_prev, frame_curr, depth_prev, depth_curr, motion_vectors, input_fps, DOF):
             
         # Decode OFA Fixed-Point Vectors to Float32 Pixel Offsets
         flow_f32 = motion_vectors.to(torch.float32) / 16.0 
@@ -102,3 +102,8 @@ class VFMotionSmoother:
             hole_masks.append(double_occlusion_mask)
             
         return synthetic_frames, hole_masks
+    
+    # Shift completed frames (warped and inpainted) by the extra amount the headset has moved since
+    def shift(frames, DOF):
+        # TODO
+        return None
