@@ -58,7 +58,7 @@ class VFMotionSmoother:
         return torch.clamp(disocclusion_mask + edge_mask, 0.0, 1.0)
 
     # Dynamically outputs the necessary frames to hit 90 FPS.
-    def generate_frames(self, frame_prev, frame_curr, depth_map, motion_vectors, input_fps):
+    def generate_frames(self, frame_prev, frame_curr, depth_prev, depth_curr, motion_vectors, input_fps):
             
         # Decode OFA Fixed-Point Vectors to Float32 Pixel Offsets
         flow_f32 = motion_vectors.to(torch.float32) / 16.0 
@@ -76,8 +76,8 @@ class VFMotionSmoother:
             
             # Assume depth_map is normalized 0.0 (far) to 1.0 (close)
             # We warp the depth map forward so it aligns with the synthetic frame
-            warp_d0 = self.warp_frame(depth_map.unsqueeze(0), flow_f32, t_scale=-t)
-            warp_d1 = self.warp_frame(depth_map.unsqueeze(0), flow_f32, t_scale=(1 - t))
+            warp_d0 = self.warp_frame(depth_prev.unsqueeze(0), flow_f32, t_scale=-t)
+            warp_d1 = self.warp_frame(depth_curr.unsqueeze(0), flow_f32, t_scale=(1 - t))
             
             # Create dynamic weights: High depth (closer) + Time proximity wins
             weight_f0 = torch.exp(warp_d0 * 5.0) * (1 - t)

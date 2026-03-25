@@ -5,7 +5,8 @@ import torch
 import blackwell_ofa
 import core.warper as smoother
 from core.neural_inpaint import FastInpainter
-from capture.input_hook import get_vr_color_and_depth, submit_to_headset
+from capture.input_hook import get_vr_color_and_depth
+from capture.output_hook import submit
 
 def main():
     print("Initializing Neural VR Motion Smoothing Engine...")
@@ -28,7 +29,9 @@ def main():
     
     # 3. VR Hook (Color + Depth Buffers)
     print("Connecting to OpenXR Swapchains (Color + Z-Buffer)...")
-    #TODO
+    capture = get_vr_color_and_depth()
+
+    frame_prev, depth_prev = None
 
     print("\n--- ENGINE READY. ENTERING VR RUNTIME LOOP ---")
     
@@ -45,15 +48,23 @@ def main():
             
             # Mocking the 8K tensors for the skeleton
             # Mocking Color Tensors as RGB (3, H, W) ranging 0-255
-            frame_prev = torch.randint(0, 256, (3, TARGET_HEIGHT, TARGET_WIDTH), device='cuda', dtype=torch.uint8)
-            frame_curr = torch.randint(0, 256, (3, TARGET_HEIGHT, TARGET_WIDTH), device='cuda', dtype=torch.uint8)
+            # frame_prev = torch.randint(0, 256, (3, TARGET_HEIGHT, TARGET_WIDTH), device='cuda', dtype=torch.uint8)
+            # frame_curr = torch.randint(0, 256, (3, TARGET_HEIGHT, TARGET_WIDTH), device='cuda', dtype=torch.uint8)
+            
             # Mocking Z-Buffer (1, H, W) normalized 0.0 to 1.0
-            depth_curr = torch.rand((TARGET_HEIGHT, TARGET_WIDTH), device='cuda', dtype=torch.float32)
+            # depth_curr = torch.rand((TARGET_HEIGHT, TARGET_WIDTH), device='cuda', dtype=torch.float32)
 
             # Mocking FPS
-            current_engine_fps = 45
+            # current_engine_fps = 45
 
-            if current_engine_fps < TARGET_FPS:
+            frame_curr, depth_curr, fps = capture.getData()
+
+            if frame_prev is None:
+                frame_prev = frame_curr
+                depth_prev = depth_curr
+                continue
+
+            if fps < TARGET_FPS:
 
                 # ---------------------------------------------------------
                 # STEP B: OPTICAL FLOW
@@ -75,10 +86,11 @@ def main():
                 # ---------------------------------------------------------
                 warped_frames, hole_masks = warper.generate_frames(
                     frame_prev, 
-                    frame_curr, 
+                    frame_curr,
+                    depth_prev,
                     depth_curr, 
                     motion_vectors, 
-                    current_engine_fps
+                    fps
                 )
                 
                 # ---------------------------------------------------------
@@ -95,12 +107,15 @@ def main():
             
             
             # Send the frame to headset
-            submit_to_headset(final_frames)
+            submit(final_frames)
             
             # --- Benchmarking ---
             elapsed_ms = (time.perf_counter() - start_time) * 1000
             print(f"Pipeline Latency: {elapsed_ms:.2f} ms", end='\r')
             
+            frame_prev = frame_curr
+            depth_prev = depth_curr
+
             break # TODO Remove for loop
 
     except KeyboardInterrupt:
