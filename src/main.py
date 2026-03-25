@@ -5,7 +5,7 @@ import torch
 import blackwell_ofa
 import core.warper as smoother
 from core.inpaint import inpainter
-from connection.capture_hook import get_vr_color_and_depth
+import capture_hook
 from connection.headset_hook import submit, get6DOF, getEyes
 
 def main():
@@ -29,7 +29,7 @@ def main():
     
     # 3. VR Hook (Color + Depth Buffers)
     print("Connecting to OpenXR Swapchains (Color + Z-Buffer)...")
-    capture = get_vr_color_and_depth()
+    capture = capture_hook
 
     frame_prev, depth_prev = None
 
